@@ -1,0 +1,10 @@
+# Ensure correct line endings across platforms — Makefiles MUST use LF
+* text=auto
+Makefile eol=lf
+*.mk text eol=lf
+*.c text
+*.h text
+*.rs text
+*.md text
+*.sh text eol=lf
+*.png binary
