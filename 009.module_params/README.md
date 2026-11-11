@@ -1,35 +1,35 @@
-# 009.module_params
+# 009: Module Parameters
 
-A module can receive values when you load it, instead of hardcoding
-them in the source. `insmod` takes `key=value` pairs after the `.ko`
-file. Every declared parameter also appears as a file under
-`/sys/module/<module>/parameters/`.
+A module can receive values when you load it, instead of hardcoding them in the source. `insmod` takes `key=value` pairs after the `.ko` file. Every declared parameter also appears as a file under `/sys/module/<module>/parameters/`.
 
-## What
+## What the module does
 
 - Accepts 4 parameters at load time:
-  - `myname` (string), `count` (int), `myarray` (comma-separated int
-    array), `debug` (bool)
+  - `myname` (string), `count` (int), `myarray` (comma-separated int array), `debug` (bool)
 - Greets `myname` `count` times in dmesg
 - Registers them read-only (mode 0444) in sysfs
 
-## What you learn
+## How the parameters are declared
 
-- `module_param()` / `module_param_array()` / `MODULE_PARM_DESC()`
-- What `charp` means (pointer to a userspace-supplied C string)
-- The sysfs file mode meanings: `0` = no file, `0444` = read-only,
-  `0644` = changeable at runtime by root
-- Where `/sys/module/<module>/parameters/` lives
+```c
+static char *myname = "nobody";   /* charp = pointer to a C string */
+static int count = 1;
+static int myarray[8];
+static int myarray_len;
+static bool debug = false;
 
-## Files
+module_param(myname, charp, 0444);
+MODULE_PARM_DESC(myname, "Name to greet (string)");
+module_param_array(myarray, int, &myarray_len, 0444);
+```
 
-| File       | Purpose                                |
-| ---------- | -------------------------------------- |
-| `main.c`   | C module with the four parameters      |
-| `main.rs`  | Rust twin (`params` section of `module!`) |
-| `Makefile` | Wrapper that invokes the kernel build  |
-| `Kbuild`   | The real build rules (`obj-m`)         |
-| `README.md`| This file                              |
+The last argument of `module_param()` is the mode of the sysfs file:
+
+- `0` - no file in `/sys` at all
+- `0444` - file exists, read-only for normal users (this lesson)
+- `0644` - root may write the file to change the value at runtime
+
+`MODULE_PARM_DESC` is documentation; it shows up in `modinfo`.
 
 ## How to build
 
@@ -55,8 +55,7 @@ echo 99 > /sys/module/myparams/parameters/count   # Permission denied
 sudo rmmod myparams
 ```
 
-Tip: `modinfo myparams.ko` lists every parameter together with its
-`MODULE_PARM_DESC` text.
+Tip: `modinfo -p myparams.ko` lists every parameter with its description.
 
 ## Expected output
 
@@ -76,24 +75,12 @@ myparams_init: debug output enabled
 
 ## Common bug + fix
 
-**Bug:** `sudo insmod myparams.ko myname=Gopal count=5` fails with
-`Invalid module format` or silently keeps the default values.
+**Bug:** `sudo insmod myparams.ko myname=Gopal count=5` fails with `Invalid module format` or silently keeps the default values.
 
-**Cause:** typo in the parameter name. Unknown parameters make insmod
-reject the module (or, with a leading dash prefix, get ignored) - the
-kernel matches names exactly, and `Count=5` is not `count=5`.
+**Cause:** typo in the parameter name. The kernel matches names exactly, and `Count=5` is not `count=5`.
 
-**Fix:** check exact names with `modinfo -p myparams.ko`. Note that
-array params must be comma-separated (`myarray=1,2,3`), not
-space-separated, and a wrong value type (`count=abc`) also makes insmod
-fail with `Invalid module format`.
+**Fix:** check exact names with `modinfo -p myparams.ko`. Array params must be comma-separated (`myarray=1,2,3`), not space-separated, and a wrong value type (`count=abc`) also makes insmod fail.
 
 ## Rust version (main.rs)
 
-- All parameter declaration lives in the `params` section of `module!`
-- `charp` maps to `str`, and the sysfs file mode is written in octal
-  (`0o444`) instead of `0444`
-- The int-array parameter has no Rust binding yet in the ~6.8-era
-  trees - that part is C-only (see `main.c`)
-- Same API-version caveat as lesson 007 (needs a `CONFIG_RUST=y`
-  kernel such as `linux-rust` on Arch)
+All parameter declaration lives in the `params` section of the `module!` macro: `charp` maps to `str` and the file mode is written in octal (`0o444`). The int-array parameter has no Rust binding yet in the ~6.8-era trees, so that part stays C-only. Same API-version caveat as lesson 007 (needs a `CONFIG_RUST=y` kernel such as `linux-rust` on Arch).
