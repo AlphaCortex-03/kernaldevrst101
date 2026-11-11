@@ -1,8 +1,10 @@
-# User-facing wrapper. The real build rules live in ./Kbuild
-# (the kernel build system prefers Kbuild over Makefile when both exist).
+obj-m := mychar.o
+mychar-objs := main.o
 
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+
+.PHONY: all clean

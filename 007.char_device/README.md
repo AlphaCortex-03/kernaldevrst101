@@ -1,44 +1,34 @@
-# 007.char_device
+# 007: Character Device
 
-A character device is the simplest way to expose kernel functionality to
-userspace: it shows up as a normal file in `/dev`, and every `open()`,
-`read()`, `write()` and `close()` on that file is routed by the kernel
-into one of your functions.
+A character device is the simplest way to expose kernel functionality to userspace: it shows up as a normal file in `/dev`, and every `open()`, `read()`, `write()` and `close()` on that file is routed by the kernel into one of your functions.
 
-We use `misc_register()` instead of registering a real major number:
-misc devices all share major 10, the kernel picks a free minor, and it
-even creates the `/dev/mydevice` node for us automatically.
+We use `misc_register()` instead of registering a real major number: misc devices all share major 10, the kernel picks a free minor, and it even creates the `/dev/mydevice` node for us automatically.
 
-## What
+## What the module does
 
 - Registers `/dev/mydevice` via `misc_register()`
 - Implements `file_operations`: `open`, `read`, `write`, `release`
-- Every callback only logs to dmesg (real data transfer = lesson 008)
+- Every callback only logs to dmesg (real data transfer is lesson 008)
 
-## What you learn
+## Licensing
 
-- What `file_operations` is and how the VFS routes file calls into it
-- Why `miscdevice` is the easy way to make a character device
-- What `__user` on a pointer parameter means (a userspace pointer you
-  must never dereference directly)
-- That returning `0` from `read()` means EOF
+The module declares `MODULE_LICENSE("GPL")`. Without it, loading fails or taints the kernel, and GPL-only kernel symbols are not available.
 
-## Files
+## The four file_operations callbacks
 
-| File       | Purpose                                        |
-| ---------- | ---------------------------------------------- |
-| `main.c`   | C module: registers the misc device            |
-| `main.rs`  | Rust twin using the `miscdevice` bindings      |
-| `Makefile` | Wrapper that invokes the kernel build          |
-| `Kbuild`   | The real build rules (`obj-m`)                 |
-| `README.md`| This file                                      |
+| Callback | Called when | Return value |
+| -------- | ----------- | ------------ |
+| `open` | a program opens the file | `0` on success |
+| `read` | a program reads the file | bytes delivered; `0` means EOF |
+| `write` | a program writes the file | bytes accepted |
+| `release` | the file is closed | `0` on success |
+
+`.owner = THIS_MODULE` keeps the module loaded while the file is open, so the module cannot be unloaded under a running file descriptor.
 
 ## How to build
 
 ```bash
-# once per kernel: Arch needs the headers of the RUNNING kernel
-sudo pacman -S linux-headers
-
+sudo pacman -S linux-headers   # once: Arch needs headers of the running kernel
 cd 007.char_device
 make
 ```
@@ -71,29 +61,14 @@ mychar_exit: /dev/mydevice removed
 
 ## Common bug + fix
 
-**Bug:** `cat /dev/mydevice` never stops and dmesg floods with read
-messages.
+**Bug:** `cat /dev/mydevice` never stops and dmesg floods with read messages.
 
-**Cause:** your `read()` returns a positive size every call and never
-advances `*pos`, so `cat` loops forever, always believing there is more
-data.
+**Cause:** `read()` returns a positive size every call and never advances `*pos`, so `cat` loops forever, always believing there is more data.
 
-**Fix:** honor the `*pos` offset and return `0` when there is nothing
-left - `0` from `read()` is EOF and makes `cat` stop. Lesson 008 shows a
-`read()` that does this correctly.
+**Fix:** honor the `*pos` offset and return `0` when there is nothing left - `0` from `read()` is EOF and makes `cat` stop. Lesson 008 shows a `read()` that does this correctly.
 
 ## Rust version (main.rs)
 
-`main.rs` is the same module written against the Rust-for-Linux
-bindings. Differences to know:
+`main.rs` is the same module against the Rust-for-Linux bindings: you implement the `MiscDevice` trait and the bindings build the file_operations table for you. There is no raw `__user` pointer either - the `UserSlicePtrReader`/`Writer` handed to write/read are the enforced-safe `copy_from_user()`/`copy_to_user()`.
 
-- There is no `file_operations` struct: you implement the `MiscDevice`
-  trait and the bindings build the table for you.
-- There is no raw `__user` pointer: the `UserSlicePtrReader` /
-  `UserSlicePtrWriter` handed to `write`/`read` are the enforced-safe
-  equivalents of `copy_from_user()` / `copy_to_user()`.
-- The Rust-for-Linux API is not in mainline yet and changes between
-  releases; this file targets the ~6.8 rust-next API. Building Rust
-  kernel modules needs a `CONFIG_RUST=y` kernel (on Arch: `linux-rust`)
-  and a matching rustup toolchain. The C version above is what this
-  folder builds and tests by default.
+The Rust-for-Linux API is not in mainline yet and changes between releases; `main.rs` targets the ~6.8 rust-next API and needs a `CONFIG_RUST=y` kernel (on Arch: `linux-rust`) plus a matching rustup toolchain. The C version is what this folder builds and tests by default.

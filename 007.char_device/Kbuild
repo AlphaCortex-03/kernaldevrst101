@@ -1,9 +1,0 @@
-# 007.char_device - kernel build rules.
-# Builds main.c into the module file mychar.ko.
-
-obj-m := mychar.o
-mychar-objs := main.o
-
-# Rust twin (main.rs) needs a CONFIG_RUST=y kernel (on Arch: linux-rust)
-# plus a matching rustup toolchain. Rust-for-Linux out-of-tree module
-# builds are still experimental - see README.md for how to try it.
