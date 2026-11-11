@@ -1,24 +1,14 @@
-# 010.sysfs
+# 010: sysfs
 
-sysfs is the kernel's "one value per file" configuration/state tree.
-This module creates `/sys/kernel/my_mod/value`: reading the file calls
-your `show()` function, writing it calls your `store()` function.
+sysfs is the kernel's "one value per file" configuration/state tree. This module creates `/sys/kernel/my_mod/value`: reading the file calls your `show()` function, writing it calls your `store()` function.
 
-## What
+## What the module does
 
 - Creates the kobject directory `/sys/kernel/my_mod`
 - Creates the attribute file `value` (default 42, mode 0644)
 - `cat` reads the value via `show()`, `echo 99` sets it via `store()`
 
-## What you learn
-
-- `kobject_create_and_add()` + `sysfs_create_file()`
-- `__ATTR(name, mode, show, store)` and the show/store contract
-- `sysfs_emit()` for filling the page buffer safely
-- `kstrtoint()` as the kernel's safe string-to-int converter
-- The sysfs / procfs / debugfs split (below)
-
-### sysfs vs procfs vs debugfs
+## sysfs vs procfs vs debugfs
 
 | FS       | Purpose                              | Example                       |
 | -------- | ------------------------------------ | ----------------------------- |
@@ -26,19 +16,28 @@ your `show()` function, writing it calls your `store()` function.
 | `procfs` | process information and some legacy kernel state; often human-readable multi-line streams | `/proc/cpuinfo`, `/proc/meminfo` |
 | `debugfs`| developer debugging, no rules, no stability guarantees, usually mounted at `/sys/kernel/debug` | `/sys/kernel/debug/*` |
 
-Rule of thumb: exporting a knob or a status number -> **sysfs**.
-Reporting processes -> procfs. Quick and dirty dumps for yourself ->
-debugfs (never for production interfaces).
+Rule of thumb: exporting a knob or a status number -> **sysfs**. Reporting processes -> procfs. Quick and dirty dumps for yourself -> debugfs (never for production interfaces).
 
-## Files
+## How show() and store() work
 
-| File       | Purpose                                          |
-| ---------- | ------------------------------------------------ |
-| `main.c`   | C module with kobject + attribute                |
-| `main.rs`  | Rust twin (parameter with `0o644` permissions)   |
-| `Makefile` | Wrapper that invokes the kernel build            |
-| `Kbuild`   | The real build rules (`obj-m`)                   |
-| `README.md`| This file                                        |
+```c
+static ssize_t value_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+        return sysfs_emit(buf, "%d\n", value);   /* fill the page buffer */
+}
+
+static ssize_t value_store(struct kobject *kobj, struct kobj_attribute *attr,
+                           const char *buf, size_t count)
+{
+        int ret = kstrtoint(buf, 0, &new_value); /* safe string->int */
+        if (ret)
+                return ret;                      /* refuse junk input */
+        value = new_value;
+        return count;                            /* bytes consumed */
+}
+```
+
+`__ATTR(name, mode, show, store)` wires the functions to the file. (`DEVICE_ATTR` is for `struct device` in the driver model; we attach to a plain kobject, so we use `__ATTR`.)
 
 ## How to build
 
@@ -68,24 +67,12 @@ mysysfs_exit: /sys/kernel/my_mod removed
 
 ## Common bug + fix
 
-**Bug:** `echo abc > /sys/kernel/my_mod/value` crashes the kernel, or
-`store()` silently accepts garbage.
+**Bug:** `echo abc > /sys/kernel/my_mod/value` crashes the kernel, or `store()` silently accepts garbage.
 
-**Cause:** parsing with `sscanf`/`atoi`-style code that trusts the
-input, or returning the wrong length from `store()`.
+**Cause:** parsing with `sscanf`/`atoi`-style code that trusts the input, or returning the wrong length from `store()`.
 
-**Fix:** parse with `kstrtoint()` (or `kstrtoul` etc.) and check its
-return value; on failure return the error so the write fails cleanly.
-Always return the number of bytes consumed (`count`) on success -
-returning 0 makes the shell retry the write forever.
+**Fix:** parse with `kstrtoint()` and check its return value; on failure return the error so the write fails cleanly. Always return the number of bytes consumed (`count`) on success - returning 0 makes the shell retry the write forever.
 
 ## Rust version (main.rs)
 
-The ~6.8-era Rust bindings have no raw kobject/sysfs attribute API yet.
-The Rust version therefore exposes the same `value` as a module
-parameter with `permissions: 0o644`, which creates
-`/sys/module/mysysfs_rs/parameters/value` - readable and (for root)
-writable at runtime, the same "one value per file" idea. For the
-kobject-based `/sys/kernel/my_mod/value` use `main.c`. Same
-API-version caveat as lesson 007 (needs a `CONFIG_RUST=y` kernel such
-as `linux-rust` on Arch).
+The ~6.8-era Rust bindings have no raw kobject/sysfs attribute API yet, so the Rust version exposes the same `value` as a module parameter with `permissions: 0o644`, which creates `/sys/module/mysysfs_rs/parameters/value` - readable and (for root) writable at runtime, the same "one value per file" idea. For the kobject-based file use `main.c`. Same API-version caveat as lesson 007.
