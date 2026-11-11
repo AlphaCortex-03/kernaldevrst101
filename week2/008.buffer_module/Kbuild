@@ -1,0 +1,8 @@
+# 008.buffer_module - kernel build rules.
+# Builds main.c into the module file mybuf.ko.
+
+obj-m := mybuf.o
+mybuf-objs := main.o
+
+# Rust twin (main.rs) needs a CONFIG_RUST=y kernel (on Arch: linux-rust)
+# plus a matching rustup toolchain. See README.md.
