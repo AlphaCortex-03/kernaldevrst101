@@ -98,21 +98,14 @@ Notes:
 | `004.Multiple_files` | Module built from multiple source files | ✔ | ✔ |
 | `005.Multiple_kernel_module` | Building several modules from one Makefile (docs) | ✖ | ✖ |
 | `006.dmesg` | Debugging module output with `dmesg` (docs) | ✖ | ✖ |
+| `007.char_device` | Character device on `/dev/mydevice` via `misc_register` | ✔ | ✔ |
+| `008.buffer_module` | Move real data with `copy_to_user` / `copy_from_user` | ✔ | ✔ |
+| `009.module_params` | Module parameters at `insmod` time | ✔ | ✔ |
+| `010.sysfs` | Expose one value under `/sys/kernel/my_mod/value` | ✔ | ✔ |
+| `011.ioctl` | Control commands (`_IO`/`_IOR`/`_IOW`) + userspace app | ✔ | ✔ |
+| `012.memory` | kmalloc vs kzalloc vs vmalloc, GFP flags | ✔ | ✔ |
 
-Each week-1 lesson folder contains a `c/` and/or `rust/` sub-folder with its own `Makefile` and README.
-
-## Week 2 (lessons 007-012)
-
-| Folder | Lesson | C | Rust |
-|--------|--------|---|------|
-| `week2/007.char_device` | Character device on `/dev/mydevice` via `misc_register` | ✔ | ✔ |
-| `week2/008.buffer_module` | Move real data with `copy_to_user` / `copy_from_user` | ✔ | ✔ |
-| `week2/009.module_params` | Module parameters at `insmod` time | ✔ | ✔ |
-| `week2/010.sysfs` | Expose one value under `/sys/kernel/my_mod/value` | ✔ | ✔ |
-| `week2/011.ioctl` | Control commands (`_IO`/`_IOR`/`_IOW`) + userspace app | ✔ | ✔ |
-| `week2/012.memory` | kmalloc vs kzalloc vs vmalloc, GFP flags | ✔ | ✔ |
-
-Each `week2/` lesson has `main.c`, `main.rs`, `Makefile`, `Kbuild` and a README with build + test steps. See `week2/README.md` for the overview.
+Each lesson folder contains its C and Rust sources, a `Makefile` and a README with build + test steps. Week-1 folders use a `c/` + `rust/` layout; lessons 007-012 keep `main.c`, `main.rs`, `Makefile` flat in the folder.
 
 ## Prerequisites
 
