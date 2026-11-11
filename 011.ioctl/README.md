@@ -1,14 +1,10 @@
-# 011.ioctl
+# 011: ioctl
 
-`read`/`write` only move a stream of bytes. To let a program send
-*commands* ("clear the buffer", "how big is the buffer?", "store this
-value") you add an ioctl handler: one function that receives a command
-number plus one argument.
+`read`/`write` only move a stream of bytes. To let a program send *commands* ("clear the buffer", "how big is the buffer?", "store this value") you add an ioctl handler: one function that receives a command number plus one argument.
 
-This lesson is the first with a **userspace program** (`user_app.c`)
-talking to the kernel module.
+This lesson is the first with a **userspace program** (`user_app.c`) talking to the kernel module.
 
-## What
+## What the module does
 
 - Registers `/dev/mydevice` (misc device, like lessons 007/008)
 - Handles plain `write()` (stores bytes in a 1024-byte buffer)
@@ -18,25 +14,18 @@ talking to the kernel module.
   - `IOCTL_SET_VALUE` (`_IOW`) - kernel receives an int
 - `user_app.c` exercises all of them
 
-## What you learn
+## How the command numbers work
 
-- `_IO` / `_IOR` / `_IOW` command encoding and the magic byte
-  (R = data flows **out** of the kernel, W = data flows **in** - easy
-  to mix up, they are from the *device's* point of view)
-- `.unlocked_ioctl = my_ioctl` in `file_operations`
-- `ENOTTY` as the traditional "unknown ioctl command" error
-- How `ioctl()` from libc reaches your kernel handler
+The magic byte is an arbitrary character identifying our device; `_IO`/`_IOR`/`_IOW` pack magic, sequence number, data size and direction into one number:
 
-## Files
+```c
+#define IOCTL_MAGIC 'g'
+#define IOCTL_CLEAR     _IO(IOCTL_MAGIC, 1)       /* no data          */
+#define IOCTL_GET_SIZE  _IOR(IOCTL_MAGIC, 2, int) /* int sent OUT     */
+#define IOCTL_SET_VALUE _IOW(IOCTL_MAGIC, 3, int) /* int sent IN      */
+```
 
-| File         | Purpose                                             |
-| ------------ | --------------------------------------------------- |
-| `main.c`     | kernel module with the ioctl handler                |
-| `user_app.c` | userspace program that calls `ioctl()`              |
-| `main.rs`    | Rust twin (`ioctl` method of the `MiscDevice` trait)|
-| `Makefile`   | wrapper; also builds `user_app` with gcc            |
-| `Kbuild`     | the real build rules (`obj-m`)                      |
-| `README.md`  | this file                                           |
+R = data flows **out** of the kernel, W = data flows **in** (from the *device's* point of view - easy to mix up). The same three `#define`s must appear in `user_app.c`: the number IS the command.
 
 ## How to build
 
@@ -85,27 +74,12 @@ my_release: device closed
 
 ## Common bug + fix
 
-**Bug:** `./user_app` fails with `ioctl: Inappropriate ioctl for
-device` (errno `ENOTTY`).
+**Bug:** `./user_app` fails with `ioctl: Inappropriate ioctl for device` (errno `ENOTTY`).
 
-**Cause:** the command numbers in `user_app.c` and `main.c` disagree -
-different magic byte, different sequence number, or a different `type`
-in `_IOR`/`_IOW`. The number IS the command; the kernel only compares
-raw integers.
+**Cause:** the command numbers in `user_app.c` and `main.c` disagree - different magic byte, different sequence number, or a different data type inside the macro. The kernel only compares raw integers.
 
-**Fix:** keep one definition. The magic and numbers must match
-*exactly*, including the data type inside the macro (`_IOR(magic, 2,
-int)` vs `_IOR(magic, 2, long)` produce different numbers). Best
-practice: put the `#define`s in a shared header when you grow out of
-two files.
+**Fix:** keep one definition. Magic and numbers must match *exactly*, including the type (`_IOR(magic, 2, int)` vs `_IOR(magic, 2, long)` produce different numbers). Best practice: put the `#define`s in a shared header as the project grows.
 
 ## Rust version (main.rs)
 
-- Command numbers are plain `const u32` values computed with the same
-  bit layout the C macros use (some trees also ship `kernel::ioctl`
-  helpers)
-- `int __user *` does not exist in Rust: `UserSlice::new(arg, size)`
-  gives you the enforced-safe `copy_to_user`/`copy_from_user`
-- The unknown-command branch returns the same `ENOTTY`
-- Same API-version caveat as lesson 007 (targets ~6.8 rust-next, needs
-  a `CONFIG_RUST=y` kernel such as `linux-rust` on Arch)
+Command numbers are plain `const u32` values computed with the same bit layout the C macros use, and there is no `int __user *` cast: `UserSlice::new(arg, size)` gives the enforced-safe `copy_to_user`/`copy_from_user`. Unknown commands return the same `ENOTTY`. Same API-version caveat as lesson 007 (targets ~6.8 rust-next, needs a `CONFIG_RUST=y` kernel such as `linux-rust` on Arch).
