@@ -1,0 +1,8 @@
+# 009.module_params - kernel build rules.
+# Builds main.c into the module file myparams.ko.
+
+obj-m := myparams.o
+myparams-objs := main.o
+
+# Rust twin (main.rs) needs a CONFIG_RUST=y kernel (on Arch: linux-rust)
+# plus a matching rustup toolchain. See README.md.
