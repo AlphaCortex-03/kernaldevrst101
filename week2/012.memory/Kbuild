@@ -1,0 +1,8 @@
+# 012.memory - kernel build rules.
+# Builds main.c into the module file mymemory.ko.
+
+obj-m := mymemory.o
+mymemory-objs := main.o
+
+# Rust twin (main.rs) needs a CONFIG_RUST=y kernel (on Arch: linux-rust)
+# plus a matching rustup toolchain. See README.md.
